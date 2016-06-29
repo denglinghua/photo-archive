@@ -1,10 +1,10 @@
 package photo_tool;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -21,9 +21,9 @@ import com.drew.metadata.file.FileMetadataDirectory;
 public class Renamer {
 
 	public static void main(String[] args) {
-		String photoDir;
+		final String photoDir;
 		if (args.length < 1) {
-			log("Usage:cmd photo_dir");
+			Utils.log("usage:cmd photo_dir");
 			return;
 		} else {
 			photoDir = args[0];
@@ -32,24 +32,26 @@ public class Renamer {
 		new Renamer(photoDir).rename();
 	}
 
-	String photoDir;
-	Counter counter;
+	private final static Set<String> imageExtensions = new HashSet<String>(Arrays.asList("jpg", "jpeg", "png"));
+	private final static Set<String> videoExtensions = new HashSet<String>(Arrays.asList("mov", "avi"));
+	private final String photoDir;
+	private Counter counter;
 
-	public Renamer(final String photoDir) {
+	public Renamer(String photoDir) {
 		this.photoDir = photoDir.trim();
 	}
 
 	void rename() {
 		final File photoDirPath = new File(photoDir);
 		if (!photoDirPath.exists()) {
-			logError(String.format("Photo dir '%s' not exists.", this.photoDir));
+			Utils.logError(String.format("photo dir '%s' not exists.", this.photoDir));
 			return;
 		}
 
-		log("start...");
-		log("photo directory : " + photoDir);
+		Utils.log("start...");
+		Utils.log("photo directory : " + photoDir);
 
-		File[] photoList = getPhotoList(photoDirPath);
+		final File[] photoList = getPhotoList(photoDirPath);
 
 		counter = new Counter(photoList.length);
 
@@ -57,15 +59,17 @@ public class Renamer {
 			renamePhotoByDate(photo);
 		}
 
-		log(counter.toString());
+		Utils.log(counter.toString());
 
-		log("completed.");
+		Utils.log("completed.");
 	}
 
-	void renamePhotoByDate(final File photo) {
-		Date photoDate;
+	private void renamePhotoByDate(final File photo) {
+		final Date photoDate;
+		final String fileExtension = Utils.getFileExtension(photo.getName()).toLowerCase();
 		try {
-			photoDate = getPhotoCreationDate(photo);
+			boolean isVideo = videoExtensions.contains(fileExtension);
+			photoDate = isVideo ? getVideoCreationDate(photo) : getPhotoCreationDate(photo);
 		} catch (Exception e) {
 			System.err.printf("extract date from photo '%s' error", photo.getName());
 			counter.error++;
@@ -75,7 +79,7 @@ public class Renamer {
 		final DateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss");
 		String newPhotoName = format.format(photoDate);
 
-		File newPhotoFile = new File(photo.getParent(), newPhotoName + "." + getFileExtension(photo.getName()));
+		File newPhotoFile = new File(photo.getParent(), newPhotoName + "." + fileExtension);
 		if (!newPhotoFile.exists()) {
 			try {
 				Files.move(photo.toPath(), newPhotoFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -88,38 +92,16 @@ public class Renamer {
 		}
 	}
 
-	private File[] getPhotoList(File photoDirPath) {
-		final Set<String> acceptedExtensions = new HashSet<String>(Arrays.asList("jpg", "jpeg", "png", "mov"));
+	private File[] getPhotoList(final File photoDirPath) {
+		Set<String> acceptedExtensions = new HashSet<String>();
+		acceptedExtensions.addAll(imageExtensions);
+		acceptedExtensions.addAll(videoExtensions);
 
-		// TODO process subdirectories recursively?
-		final File[] photoList = photoDirPath.listFiles(new FileFilter() {
-			public boolean accept(final File file) {
-				if (file.isDirectory())
-					return false;
-				String extension = getFileExtension(file.getName()).toLowerCase();
-				if (!acceptedExtensions.contains(extension))
-					return false;
-				return true;
-			}
-		});
-
-		return photoList;
+		return Utils.getFileList(photoDirPath, acceptedExtensions);
 	}
 
-	// no '.' in file path dir
-	static String getFileExtension(String fileName) {
-		String extension = "";
-
-		int i = fileName.lastIndexOf('.');
-		if (i > 0) {
-			extension = fileName.substring(i + 1);
-		}
-
-		return extension;
-	}
-
-	static Date getPhotoCreationDate(File photo) throws Exception {
-		Metadata metadata = ImageMetadataReader.readMetadata(photo);
+	private Date getPhotoCreationDate(File file) throws Exception {
+		Metadata metadata = ImageMetadataReader.readMetadata(file);
 		ExifSubIFDDirectory exifDir = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
 		Date creationDate;
 		TimeZone timeZone = TimeZone.getDefault();
@@ -133,16 +115,13 @@ public class Renamer {
 		return creationDate;
 	}
 
-	static void log(String msg) {
-		System.out.println(msg);
+	private Date getVideoCreationDate(File file) throws IOException {
+		BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
+		return new Date(Math.min(attr.creationTime().toMillis(), attr.lastModifiedTime().toMillis()));
 	}
 
-	static void logError(String msg) {
-		System.err.println(msg);
-	}
-
-	class Counter {
-		public int total;
+	private class Counter {
+		private final int total;
 		public int changed;
 		public int duplicated;
 		public int error;
