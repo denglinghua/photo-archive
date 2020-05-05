@@ -8,13 +8,16 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TimeZone;
 
 import com.drew.imaging.ImageMetadataReader;
+import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
+import com.drew.metadata.Tag;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.file.FileMetadataDirectory;
 
@@ -33,7 +36,7 @@ public class Renamer {
 	}
 
 	private final static Set<String> imageExtensions = new HashSet<String>(Arrays.asList("jpg", "jpeg", "png"));
-	private final static Set<String> videoExtensions = new HashSet<String>(Arrays.asList("mov", "avi"));
+	private final static Set<String> videoExtensions = new HashSet<String>(Arrays.asList("mov", "avi", "mp4", "m4v"));
 	private final String photoDir;
 	private Counter counter;
 
@@ -52,6 +55,11 @@ public class Renamer {
 		Utils.log("photo directory : " + photoDir);
 
 		final File[] photoList = getPhotoList(photoDirPath);
+		// IMG_####, IMG_E#### the latter image is which a filter applied to
+		// those 2 images have the same taken time
+		// To keep the latter, order the array to make it in the front of the former
+		// which will be duplicated
+		Arrays.sort(photoList, Collections.reverseOrder());
 
 		counter = new Counter(photoList.length);
 
@@ -103,21 +111,42 @@ public class Renamer {
 	private Date getPhotoCreationDate(File file) throws Exception {
 		Metadata metadata = ImageMetadataReader.readMetadata(file);
 		ExifSubIFDDirectory exifDir = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
-		Date creationDate;
+		Date creationDate = null;
 		TimeZone timeZone = TimeZone.getDefault();
 		if (exifDir != null) {
 			creationDate = exifDir.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL, timeZone);
-		} else {
+		}
+
+		if (exifDir == null || creationDate == null) {
 			// if no EXIF, return last modified date
 			FileMetadataDirectory fileDir = metadata.getFirstDirectoryOfType(FileMetadataDirectory.class);
 			creationDate = fileDir.getDate(FileMetadataDirectory.TAG_FILE_MODIFIED_DATE, timeZone);
 		}
+
 		return creationDate;
 	}
 
 	private Date getVideoCreationDate(File file) throws IOException {
 		BasicFileAttributes attr = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
 		return new Date(Math.min(attr.creationTime().toMillis(), attr.lastModifiedTime().toMillis()));
+	}
+
+	@SuppressWarnings("unused")
+	private static void printMetadata(Metadata metadata) {
+		System.out.println("-------------------------------------");
+
+		for (Directory directory : metadata.getDirectories()) {
+
+			for (Tag tag : directory.getTags()) {
+				System.out.println(tag);
+			}
+
+			if (directory.hasErrors()) {
+				for (String error : directory.getErrors()) {
+					System.err.println("ERROR: " + error);
+				}
+			}
+		}
 	}
 
 	private class Counter {
