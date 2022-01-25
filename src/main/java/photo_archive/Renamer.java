@@ -121,6 +121,7 @@ public class Renamer {
 			// if no EXIF, return last modified date
 			FileSystemDirectory fileDir = metadata.getFirstDirectoryOfType(FileSystemDirectory.class);
 			takenDate = fileDir.getDate(FileSystemDirectory.TAG_FILE_MODIFIED_DATE, timeZone);
+			System.out.printf("no taken date : %s\n", file.getName());
 		}
 
 		return takenDate;
