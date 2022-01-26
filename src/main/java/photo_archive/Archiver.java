@@ -34,7 +34,7 @@ public class Archiver {
 		this.destDir = destDir.trim();
 		this.type = type.trim();
 
-		this.fileExtensions = new HashSet<String>(type == "photo" ? Config.imageExtentions : Config.videoExtensions);
+		this.fileExtensions = new HashSet<String>(type.equals("photo") ? Config.imageExtentions : Config.videoExtensions);
 	}
 
 	public void archive() {
@@ -75,7 +75,7 @@ public class Archiver {
 		}
 		final String takenYear = takenMonth.substring(0, 4);
 		// photo archived by yyyyMM, video by yyyy
-		final String dirKey = this.type == "photo" ? takenMonth : takenYear;
+		final String dirKey = this.type.equals("photo") ? takenMonth : takenYear;
 
 		File archiveDir;
 		if (archiveDirs.containsKey(dirKey)) {
@@ -83,7 +83,7 @@ public class Archiver {
 		} else {
 			File yearDir = new File(this.destDir, takenYear);
 			yearDir.mkdir();
-			if (this.type == "photo") {
+			if (this.type.equals("photo")) {
 				archiveDir = new File(yearDir, takenMonth);
 				archiveDir.mkdir();
 			} else {
