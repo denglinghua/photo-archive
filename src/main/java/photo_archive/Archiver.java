@@ -14,23 +14,27 @@ import java.util.Set;
 
 public class Archiver {
 	public static void main(String[] args) {
-		if (args.length < 2) {
-			Utils.log("usage:cmd source_dir dest_dir");
+		if (args.length < 3) {
+			Utils.log("usage:cmd source_dir dest_dir [photo/video]");
 			return;
 		}
 
-		new Archiver(args[0], args[1]).archive();
+		new Archiver(args[0], args[1], args[2]).archive();
 	}
 
-	private final static Set<String> photoExtensions = new HashSet<String>(Config.imageExtentions);
+	private Set<String> fileExtensions;
 	private final String sourceDir;
 	private final String destDir;
-	private final Map<String, File> monthDirs = new HashMap<String, File>();
+	private final String type;
+	private final Map<String, File> archiveDirs = new HashMap<String, File>();
 	private Counter counter;
 
-	public Archiver(String sourceDir, String destDir) {
+	public Archiver(String sourceDir, String destDir, String type) {
 		this.sourceDir = sourceDir.trim();
 		this.destDir = destDir.trim();
+		this.type = type.trim();
+
+		this.fileExtensions = new HashSet<String>(type == "photo" ? Config.imageExtentions : Config.videoExtensions);
 	}
 
 	public void archive() {
@@ -49,13 +53,13 @@ public class Archiver {
 		Utils.log("source directory : " + this.sourceDir);
 		Utils.log("dest directory : " + this.destDir);
 
-		this.monthDirs.clear();
+		this.archiveDirs.clear();
 
-		final File[] photoList = Utils.getFileList(sourceDirPath, photoExtensions);
-		this.counter = new Counter(photoList.length);
+		final File[] fileList = Utils.getFileList(sourceDirPath, fileExtensions);
+		this.counter = new Counter(fileList.length);
 
-		for (File photo : photoList) {
-			moveToMonthDir(photo);
+		for (File file : fileList) {
+			moveToArchiveDir(file);
 		}
 
 		Utils.log(counter.toString());
@@ -63,32 +67,40 @@ public class Archiver {
 		Utils.log("completed.");
 	}
 
-	private void moveToMonthDir(File photo) {
-		String takenMonth = extractPhotoTakenMonth(photo.getName());
+	private void moveToArchiveDir(File file) {
+		final String takenMonth = extractPhotoTakenMonth(file.getName());
 		if (takenMonth == null) {
 			this.counter.ignored++;
 			return;
 		}
+		final String takenYear = takenMonth.substring(0, 4);
+		// photo archived by yyyyMM, video by yyyy
+		final String dirKey = this.type == "photo" ? takenMonth : takenYear;
 
-		File monthDir;
-		if (monthDirs.containsKey(takenMonth)) {
-			monthDir = monthDirs.get(takenMonth);
+		File archiveDir;
+		if (archiveDirs.containsKey(dirKey)) {
+			archiveDir = archiveDirs.get(dirKey);
 		} else {
-			File yearDir = new File(this.destDir, takenMonth.substring(0, 4));
+			File yearDir = new File(this.destDir, takenYear);
 			yearDir.mkdir();
-			monthDir = new File(yearDir, takenMonth);
-			monthDir.mkdir();
-			monthDirs.put(takenMonth, monthDir);
+			if (this.type == "photo") {
+				archiveDir = new File(yearDir, takenMonth);
+				archiveDir.mkdir();
+			} else {
+				archiveDir = yearDir;
+			}
+
+			archiveDirs.put(dirKey, archiveDir);
 		}
 
-		File destFile = new File(monthDir, photo.getName());
+		File destFile = new File(archiveDir, file.getName());
 		if (destFile.exists()) {
 			this.counter.exist++;
 			return;
 		}
 
 		try {
-			Files.move(photo.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			Files.move(file.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			this.counter.moved++;
 		} catch (IOException e) {
 			e.printStackTrace();
