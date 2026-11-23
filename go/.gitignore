@@ -1,4 +1,5 @@
-photo-archive
-photo-archive.exe
-photo-archive-darwin-*
-*.exe
+# Build outputs in go/ only (do not ignore cmd/photo-archive source)
+/photo-archive
+/photo-archive.exe
+/photo-archive-darwin-*
+/*.exe
