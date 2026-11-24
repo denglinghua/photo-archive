@@ -1,0 +1,8 @@
+{
+  "source_dir": "/path/to/inbox",
+  "dest_dir": "/path/to/photo-archive",
+  "video_dest_dir": "/path/to/video-archive",
+  "image_extensions": ["jpg", "jpeg", "png", "heic"],
+  "video_extensions": ["mov", "avi", "mp4", "m4v"],
+  "delete_patterns": ["*.AAE"]
+}

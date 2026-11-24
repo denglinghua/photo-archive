@@ -13,32 +13,15 @@ import (
 	"photo-archive/internal/fsutil"
 )
 
-var (
-	imageExts = fsutil.ExtensionSet(config.ImageExtensions)
-	videoExts = fsutil.ExtensionSet(config.VideoExtensions)
-)
-
-// IsImage reports whether ext (lowercase, no dot) is a supported image type.
-func IsImage(ext string) bool {
-	_, ok := imageExts[ext]
-	return ok
-}
-
-// IsVideo reports whether ext (lowercase, no dot) is a supported video type.
-func IsVideo(ext string) bool {
-	_, ok := videoExts[ext]
-	return ok
-}
-
 // TakenDate returns the media capture/creation time for path.
 // Photos: EXIF DateTimeOriginal, else file mod time.
 // Videos: min(birthTime, modTime).
-func TakenDate(path string) (time.Time, error) {
+func TakenDate(path string, cfg config.Config) (time.Time, error) {
 	ext := fsutil.ExtLower(path)
-	if IsVideo(ext) {
+	if cfg.IsVideo(ext) {
 		return videoCreationDate(path)
 	}
-	if IsImage(ext) {
+	if cfg.IsImage(ext) {
 		return photoTakenDate(path)
 	}
 	return time.Time{}, fmt.Errorf("unsupported extension: %s", ext)

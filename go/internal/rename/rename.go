@@ -25,9 +25,8 @@ func (s Stats) String() string {
 }
 
 // Run renames media files in dir by taken/creation date to yyyyMMdd_HHmmss.ext.
-func Run(dir string) (Stats, error) {
-	accepted := fsutil.ExtensionSet(config.ImageExtensions, config.VideoExtensions)
-	files, err := fsutil.ListFiles(dir, accepted)
+func Run(dir string, cfg config.Config) (Stats, error) {
+	files, err := fsutil.ListFiles(dir, cfg.AcceptedExtensions())
 	if err != nil {
 		return Stats{}, err
 	}
@@ -39,7 +38,7 @@ func Run(dir string) (Stats, error) {
 
 	stats := Stats{Total: len(files)}
 	for _, path := range files {
-		if err := renameOne(path, &stats); err != nil {
+		if err := renameOne(path, cfg, &stats); err != nil {
 			fmt.Fprintf(os.Stderr, "extract date from photo '%s' error: %v\n", filepath.Base(path), err)
 			stats.Error++
 		}
@@ -47,8 +46,8 @@ func Run(dir string) (Stats, error) {
 	return stats, nil
 }
 
-func renameOne(path string, stats *Stats) error {
-	taken, err := media.TakenDate(path)
+func renameOne(path string, cfg config.Config, stats *Stats) error {
+	taken, err := media.TakenDate(path, cfg)
 	if err != nil {
 		return err
 	}

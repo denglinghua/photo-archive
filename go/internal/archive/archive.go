@@ -8,7 +8,6 @@ import (
 
 	"photo-archive/internal/config"
 	"photo-archive/internal/fsutil"
-	"photo-archive/internal/media"
 )
 
 // Stats holds archive counters.
@@ -25,17 +24,17 @@ func (s Stats) String() string {
 		s.Total, s.Moved, s.Exist, s.Ignored, s.Error)
 }
 
-// Run moves renamed media from sourceDir into destDir by year/month (photos) or year (videos).
-func Run(sourceDir, destDir string) (Stats, error) {
-	accepted := fsutil.ExtensionSet(config.ImageExtensions, config.VideoExtensions)
-	files, err := fsutil.ListFiles(sourceDir, accepted)
+// Run moves renamed media from cfg.SourceDir into photo/video dest roots.
+// Photos → dest_dir/yyyy/yyyyMM/; videos → video_dest_dir/yyyy/.
+func Run(cfg config.Config) (Stats, error) {
+	files, err := fsutil.ListFiles(cfg.SourceDir, cfg.AcceptedExtensions())
 	if err != nil {
 		return Stats{}, err
 	}
 
 	stats := Stats{Total: len(files)}
 	for _, path := range files {
-		if err := moveOne(path, destDir, &stats); err != nil {
+		if err := moveOne(path, cfg, &stats); err != nil {
 			fmt.Fprintf(os.Stderr, "archive '%s' error: %v\n", filepath.Base(path), err)
 			stats.Error++
 		}
@@ -43,7 +42,7 @@ func Run(sourceDir, destDir string) (Stats, error) {
 	return stats, nil
 }
 
-func moveOne(path, destDir string, stats *Stats) error {
+func moveOne(path string, cfg config.Config, stats *Stats) error {
 	name := filepath.Base(path)
 	monthKey := extractTakenMonth(name)
 	if monthKey == "" {
@@ -54,10 +53,10 @@ func moveOne(path, destDir string, stats *Stats) error {
 	ext := fsutil.ExtLower(name)
 
 	var archiveDir string
-	if media.IsVideo(ext) {
-		archiveDir = filepath.Join(destDir, year)
+	if cfg.IsVideo(ext) {
+		archiveDir = filepath.Join(cfg.VideoDestDir, year)
 	} else {
-		archiveDir = filepath.Join(destDir, year, monthKey)
+		archiveDir = filepath.Join(cfg.DestDir, year, monthKey)
 	}
 
 	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
